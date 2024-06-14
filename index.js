@@ -6,7 +6,7 @@ rasib@gmail.com
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const port = 3000;
+const port = 4000;
 require('dotenv').config();
 const jwt = require('jsonwebtoken')
 //backend payment setup 1
@@ -18,7 +18,10 @@ const stripe = require('stripe')(process.env.SECRET_KEY)
 app.use(express.json());
 app.use(cors());
 
+
+
 const { MongoClient, ObjectId } = require('mongodb');
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.drqortc.mongodb.net`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -152,8 +155,32 @@ async function run() {
     });
 
 
-
-
+    app.post('/auth/google', async (req, res) => {
+      const { email, displayName, photoURL } = req.body;
+  //  console.log(email, displayName, photoURL )
+      try {
+          const filter = { Email: email };
+          const update = {
+              $set: {
+                Name: displayName,
+                Email: email ,
+                  Image: photoURL,
+                  user_Status:"user",
+                  Membership:false,
+                  
+              }
+          };
+          const options = { upsert: true, returnDocument: 'after' };
+  
+          // Update the user if exists or create a new user if it doesn't
+          const result = await userDatabase.findOneAndUpdate(filter, update, options);
+  
+          // Respond with user data
+          res.send(result);
+      } catch (error) {
+          res.status(500).send({ error: 'Internal Server Error' });
+      }
+  });
     /**____________________________________________________________
      * ------------------PRODUCT SECTION ---------------------------
      * ____________________________________________________________
@@ -446,6 +473,75 @@ async function run() {
     })
 
 
+// Get all products for moderation
+app.get("/moderator/products", async (req, res) => {
+  try {
+      const products = await productDatabase.find().toArray();
+      res.send(products);
+  } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Mark product as featured
+app.put("/product/featured/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await productDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { featured: true } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error marking product as featured:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Accept product
+app.put("/product/accept/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await productDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: 'Accepted' } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error accepting product:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Reject product and remove featured status
+app.put("/product/reject/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await productDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: 'Rejected', featured: false } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error rejecting product:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Get a single user by email
+app.get("/singleUser", async (req, res) => {
+  const email = req.query.email;
+  const query = { Email: email };
+  try {
+      const result = await userDatabase.findOne(query);
+      res.send(result);
+  } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
 
     /**----------------------------------------------------
      * ---------------------Admin work ----------------
@@ -526,6 +622,61 @@ async function run() {
       }
     });
 
+// Get all users
+app.get("/users", async (req, res) => {
+  try {
+      const users = await userDatabase.find().toArray();
+      res.send(users);
+  } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Update user to Moderator
+app.put("/updateTomodetrator/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await userDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { user_Status: 'moderoator' } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error updating to moderator:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Update user to Admin
+app.put("/updateAdmin/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await userDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { user_Status: 'admin' } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error updating to admin:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
+
+// Update user to User
+app.put("/updateUser/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+      const result = await userDatabase.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { user_Status: 'user' } }
+      );
+      res.send(result);
+  } catch (error) {
+      console.error("Error updating to user:", error);
+      res.status(500).send("Internal Server Error");
+  }
+});
 
 
 
